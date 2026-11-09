@@ -1799,15 +1799,16 @@ ipv6_policy(struct __ctx_buff *ctx, struct ipv6hdr *ip6, __u32 src_label,
 		}
 
 		/* Reverse NAT applies to return traffic only. */
-		if (unlikely(ct_state->rev_nat_index || ct_state->nat_port)) {
+		if (unlikely(ct_state->nat_port)) {
+			struct lb6_reverse_nat nat_info;
 			int ret2;
 
-			ret2 = lb6_rev_nat(ctx, l4_off,
-					   ct_state->rev_nat_index,
-					   &ct_state->nat_addr, ct_state->nat_port,
-					   ct_state->loopback,
-					   tuple,
-					   ipfrag_has_l4_header(ct_buffer->fraginfo));
+			ipv6_addr_copy(&nat_info.address, &ct_state->nat_addr);
+			nat_info.port = ct_state->nat_port;
+
+			ret2 = __lb6_rev_nat(ctx, l4_off, tuple, &nat_info,
+					     ipfrag_has_l4_header(ct_buffer->fraginfo),
+					     ct_state->loopback);
 			if (IS_ERR(ret2))
 				return ret2;
 		}
@@ -2084,14 +2085,16 @@ ipv4_policy(struct __ctx_buff *ctx, struct iphdr *ip4, __u32 src_label,
 		}
 
 		/* Reverse NAT applies to return traffic only. */
-		if (unlikely(ct_state->rev_nat_index || ct_state->nat_port)) {
+		if (unlikely(ct_state->nat_port)) {
+			struct lb4_reverse_nat nat_info;
 			int ret2;
 
-			ret2 = lb4_rev_nat(ctx, ETH_HLEN, l4_off,
-					   ct_state->rev_nat_index,
-					   ct_state->nat_addr.p4, ct_state->nat_port,
-					   ct_state->loopback, tuple,
-					   ipfrag_has_l4_header(fraginfo));
+			nat_info.address = ct_state->nat_addr.p4;
+			nat_info.port = ct_state->nat_port;
+
+			ret2 = __lb4_rev_nat(ctx, ETH_HLEN, l4_off, tuple, &nat_info,
+					     ct_state->loopback,
+					     ipfrag_has_l4_header(fraginfo));
 			if (IS_ERR(ret2))
 				return ret2;
 		}
