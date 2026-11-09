@@ -168,8 +168,6 @@ static __always_inline int __per_packet_lb_svc_xlate_4(void *ctx, struct iphdr *
 	svc = lb4_lookup_service(&key, NODEPORT_ENABLED);
 
 	if (NODEPORT_ENABLED) {
-		struct nodeport_nat_info *nat_info = AUX(nodeport_nat_info);
-
 		if (!svc) {
 			struct ipv4_ct_tuple tmp = tuple;
 
@@ -183,16 +181,16 @@ static __always_inline int __per_packet_lb_svc_xlate_4(void *ctx, struct iphdr *
 			 */
 			if (!ct_has_egress_entry4(get_ct_map4(&tmp), &tmp)) {
 				svc = lb4_lookup_wildcard_service(&key);
-				if (svc) {
-					nat_info->nat_addr.p4 = tuple.daddr;
-					nat_info->nat_port = tuple.sport;
-				}
 			}
 		}
 	}
 
 	if (svc) {
+		struct nodeport_nat_info *nat_info = AUX(nodeport_nat_info);
 		const struct lb4_backend *backend;
+
+		nat_info->nat_addr.p4 = tuple.daddr;
+		nat_info->nat_port = tuple.sport;
 
 		if (CONFIG(enable_l7_lb)) {
 			if (lb4_svc_is_l7_loadbalancer(svc)) {
@@ -342,8 +340,6 @@ static __always_inline int __per_packet_lb_svc_xlate_6(void *ctx, struct ipv6hdr
 	svc = lb6_lookup_service(&key, NODEPORT_ENABLED);
 
 	if (NODEPORT_ENABLED) {
-		struct nodeport_nat_info *nat_info = AUX(nodeport_nat_info);
-
 		if (!svc) {
 			struct ipv6_ct_tuple tmp = tuple;
 
@@ -357,16 +353,16 @@ static __always_inline int __per_packet_lb_svc_xlate_6(void *ctx, struct ipv6hdr
 			 */
 			if (!ct_has_egress_entry6(get_ct_map6(&tmp), &tmp)) {
 				svc = lb6_lookup_wildcard_service(&key);
-				if (svc) {
-					ipv6_addr_copy(&nat_info->nat_addr, &tuple.daddr);
-					nat_info->nat_port = tuple.sport;
-				}
 			}
 		}
 	}
 
 	if (svc) {
+		struct nodeport_nat_info *nat_info = AUX(nodeport_nat_info);
 		const struct lb6_backend *backend;
+
+		ipv6_addr_copy(&nat_info->nat_addr, &tuple.daddr);
+		nat_info->nat_port = tuple.sport;
 
 		if (CONFIG(enable_l7_lb)) {
 			if (lb6_svc_is_l7_loadbalancer(svc)) {
@@ -836,16 +832,15 @@ static __always_inline int handle_ipv6_from_lxc(struct __ctx_buff *ctx, __u32 *d
 	}
 
 	if (ENABLE_PER_PACKET_LB) {
+		struct nodeport_nat_info *nat_info = AUX_REUSE(nodeport_nat_info);
+
 		/* Restore ct_state from per packet lb handling in the previous tail call. */
 		lb6_ctx_restore_state(ctx, &ct_state_new, &proxy_port, true);
 		hairpin_flow = ct_state_new.loopback;
 
-		if (NODEPORT_ENABLED) {
-			struct nodeport_nat_info *nat_info = AUX_REUSE(nodeport_nat_info);
 
-			ipv6_addr_copy(&ct_state_new.nat_addr, &nat_info->nat_addr);
-			ct_state_new.nat_port = nat_info->nat_port;
-		}
+		ipv6_addr_copy(&ct_state_new.nat_addr, &nat_info->nat_addr);
+		ct_state_new.nat_port = nat_info->nat_port;
 	}
 
 	ct_buffer = AUX_REUSE(cilium_tail_call_buffer6);
@@ -1348,16 +1343,14 @@ static __always_inline int handle_ipv4_from_lxc(struct __ctx_buff *ctx, __u32 *d
 		return DROP_INVALID;
 
 	if (ENABLE_PER_PACKET_LB) {
+		struct nodeport_nat_info *nat_info = AUX_REUSE(nodeport_nat_info);
+
 		/* Restore ct_state from per packet lb handling in the previous tail call. */
 		lb4_ctx_restore_state(ctx, &ct_state_new, &proxy_port, &cluster_id, true);
 		hairpin_flow = ct_state_new.loopback;
 
-		if (NODEPORT_ENABLED) {
-			struct nodeport_nat_info *nat_info = AUX_REUSE(nodeport_nat_info);
-
-			ipv6_addr_copy(&ct_state_new.nat_addr, &nat_info->nat_addr);
-			ct_state_new.nat_port = nat_info->nat_port;
-		}
+		ipv6_addr_copy(&ct_state_new.nat_addr, &nat_info->nat_addr);
+		ct_state_new.nat_port = nat_info->nat_port;
 	}
 
 	bool same_subnet_id = false;
